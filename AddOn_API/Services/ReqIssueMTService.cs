@@ -110,8 +110,10 @@ namespace AddOn_API.Services
 
         public async Task<ReqIssueMaterialH> FindById(long id)
         {
+
+           
             return await databaseContext.ReqIssueMaterialHs
-                        .Include(s => s.ReqIssueMaterialDs).Where(w => w.Status == "A")
+                        .Include(s => s.ReqIssueMaterialDs.Where(w => w.Status == "A"))
                         .Include(s => s.ReqIssueMaterialLogs)
                         .Where(w => w.Id == id && w.Status != "Delete").FirstOrDefaultAsync();
 
@@ -197,6 +199,7 @@ namespace AddOn_API.Services
                             && (string.IsNullOrEmpty(reqIssueMaterialH.ReqNumber) ? 1 == 1 : w.ReqNumber == reqIssueMaterialH.ReqNumber)
                             && (string.IsNullOrEmpty(reqIssueMaterialH.Lot) ? 1 == 1 : w.Lot == reqIssueMaterialH.Lot)
                             
+                            
                             && (reqIssueMaterialH.RequestDate == null ? 1 == 1 : w.RequestDate == reqIssueMaterialH.RequestDate)
 
                         ).ToListAsync();
@@ -221,7 +224,7 @@ namespace AddOn_API.Services
                 .SelectMany(x => x.rd.DefaultIfEmpty(),
                     (t1, t2) => new { t1 = t1, t2 = t2 })
 
-                .Where(w => w.t1.pdg.ph1.ph.Lot == allocateLot.Lot && w.t1.pdg.ph1.ph.Status == "R")
+                .Where(w => w.t1.pdg.ph1.ph.Lot == allocateLot.Lot && w.t1.pdg.ph1.ph.Status == "R" &&  w.t2 == null)
                 .Select(s => new ReqIssueMTItemList
                 {
 
@@ -236,11 +239,47 @@ namespace AddOn_API.Services
                     PlandQty = s.t1.pdg.pd1.PlandQty,
                     UomName = s.t1.pdg.pd1.UomName,
                     Department = s.t1.pdg.pd1.Department,
-                    Request = s.t2.CreateBy
+                    Request = s.t2.ItemCode
 
                 })
                 .ToListAsync());
 
+
+             
+
+
+                // var items1 = await (from ph in databaseContext.ProductionOrderHs
+                //             join pd in databaseContext.ProductionOrderDs
+                //             on new {p1 = ph.Id} equals new {p1 = pd.Pdhid}
+                //             into pdg
+                //             from pdt in pdg.DefaultIfEmpty()
+                //             where pdt.Status == "A"
+                //             join isd in databaseContext.ReqIssueMaterialDs 
+                //             on new {p1 = ph.Id ,p2 = pdt.Id ,p3="A" } equals new {p1 = isd.Pdhid,p2 = isd.Pddid,p3 = isd.Status }
+                //             into isd
+                //             from isdt in isd.DefaultIfEmpty()
+
+                //             where ph.Lot == allocateLot.Lot && ph.Status == "R" && isdt == null 
+                //             select (new ReqIssueMTItemList
+                //                 {
+                //                     Id = pdt.Id,
+                //                     Pdhid = pdt.Pdhid,
+                //                     AllocateLotSizeId = pdt.AllocateLotSizeId,
+                //                     LineNum = pdt.LineNum,
+                //                     ItemType = pdt.ItemType,
+                //                     ItemCode = pdt.ItemCode,
+                //                     ItemName = pdt.ItemName,
+                //                     BaseQty =  pdt.BaseQty,
+                //                     PlandQty = pdt.PlandQty,
+                //                     UomName = pdt.UomName,
+                //                     Department = pdt.Department,
+                //                     Request = isdt.CreateBy,
+                //                 })).ToListAsync();
+
+                    
+                          
+                           
+                             
            
 
 
@@ -331,14 +370,14 @@ namespace AddOn_API.Services
             return (errorMessage, _reqIssue);
         }
 
-        public async Task<(string errorMessage, ReqIssueMaterialH reqIssueMaterialH)> VerifyDataApproveprocess(ReqIssueMaterialH reqIssueMaterialH, ReqIssueMaterialLog reqIssueMaterialLog)
+        public async Task<(string errorMessage, ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMTLog)> VerifyDataApproveprocess(ReqIssueMaterialH reqIssueMaterialH, ReqIssueMaterialLog reqIssueMaterialLog)
         {
             string errorMessage = string.Empty;
 
             List<ReqIssueMaterialLog> _log = reqIssueMaterialH.ReqIssueMaterialLogs.ToList();
 
 
-            List<VwWebTpapproval> _tpapr = await databaseContext.VwWebTpapprovals.Where(w => w.Program == "ADDON" && w.Department == reqIssueMaterialH.ReqDept && w.Site == reqIssueMaterialH.Site).ToListAsync();
+            List<VwWebTpapproval> _tpapr = (await databaseContext.VwWebTpapprovals.Where(w => w.Program == "ADDON" && w.Department == reqIssueMaterialH.ReqDept && w.Site == (reqIssueMaterialH.Site == "KTH" ? "KTH1" : reqIssueMaterialH.Site)).ToListAsync());
 
 
 
@@ -352,6 +391,9 @@ namespace AddOn_API.Services
             /// approve verify permission
             if (reqIssueMaterialLog.Status != "Request")
             {
+                var maxpermisapr = _tpapr.OrderByDescending(o=> o.Levels).FirstOrDefault();
+
+
                 var chkpermisapr = _tpapr.Where(w => w.Name!.ToUpper() == reqIssueMaterialLog.Users!.ToUpper()).FirstOrDefault();
                 if (chkpermisapr == null)
                 {
@@ -360,15 +402,24 @@ namespace AddOn_API.Services
 
                 var chklevelapr = reqIssueMaterialH.ReqIssueMaterialLogs.MaxBy(m => m.LogDate);
 
-                if (chklevelapr.Levels > chklevelapr.Levels || (chklevelapr.Levels == chklevelapr.Levels && reqIssueMaterialH.Status != "Request Discuss"))
+                if (chklevelapr.Levels > chkpermisapr.Levels || (chklevelapr.Levels == chkpermisapr.Levels && reqIssueMaterialH.Status != "Request Discuss"))
                 {
                     errorMessage = $"Don't have permisstion to action this process ({reqIssueMaterialLog.Status})";
                 }
 
+                //// check finish apr
+                if (chkpermisapr.Levels == maxpermisapr.Levels && string.IsNullOrEmpty(errorMessage) && reqIssueMaterialLog.Status == "Approved"){
+                    reqIssueMaterialH.Status = "Finish";
+                }
+
+
+                reqIssueMaterialLog.Levels = chkpermisapr.Levels;
+                reqIssueMaterialLog.LogDate = System.DateTime.Now;
+
             }
 
 
-            return (errorMessage, reqIssueMaterialH);
+            return (errorMessage, reqIssueMaterialH,reqIssueMaterialLog);
 
 
         }
@@ -504,6 +555,123 @@ namespace AddOn_API.Services
         public async Task<IEnumerable<TplocationGroup>> GetLocationIssue()
         {
             return  ( await databaseContext.TplocationGroups.ToListAsync());
+        }
+
+        
+
+        public async Task<(string errorMessage, List<ReqIssueMaterialH> reqIssueMaterialH)> GetRequestIssueByApr(ReqIssueSearch reqIssueSearch, VwWebUser vwWebUser)
+        {
+
+            string errorMessage = string.Empty;
+            List<ReqIssueMaterialH> reqIssueMaterialH = new List<ReqIssueMaterialH>();
+
+            List<String> _Status = new List<string>(new string[] {"Request","Approved","Request Discuss"});
+
+
+
+            var _aprdt = await databaseContext.VwWebTpapprovals.Where(w=> w.Program == "ADDON" && w.Types == "Request Mat" && w.Name.ToUpper() == vwWebUser.EmpUsername!.ToUpper()).FirstOrDefaultAsync();
+
+            if (_aprdt == null){
+                errorMessage = "Can't Find Approval in Template (DB)";
+                return (errorMessage,reqIssueMaterialH);
+
+            }
+
+            var grouplogId = await (databaseContext.ReqIssueMaterialLogs.GroupJoin(databaseContext.ReqIssueMaterialHs,
+                        l => new {p1 = l.ReqHid},
+                         h => new {p1 = h.Id},
+                        (l,h) => new { il = l, ih =h})
+                        .SelectMany(sm => sm.ih.DefaultIfEmpty(),
+                            (l,h) => new {  il = l,ih =h})
+                        .Where(w => _Status.Contains(w.ih.Status)
+                           && (string.IsNullOrEmpty(reqIssueSearch.Lot) ? 1==1 :  w.ih.Lot == reqIssueSearch.Lot)
+                                     && (string.IsNullOrEmpty(reqIssueSearch.RequestBy) ? 1==1 :  w.ih.RequestBy.ToLower() == reqIssueSearch.RequestBy.ToLower())
+                                     && (string.IsNullOrEmpty(reqIssueSearch.ReqDept) ? 1==1 : w.ih.ReqDept.ToLower() == reqIssueSearch.ReqDept.ToLower())
+                                    && (string.IsNullOrEmpty(reqIssueSearch.RequestDate) ? 1==1 :  w.ih.RequestDate == Convert.ToDateTime(reqIssueSearch.RequestDate)))
+                        .GroupBy( g=> g.il.il.ReqHid)
+                        .Select(s=> new {
+                            ReqHid = s.Key,
+                            Id = s.Max(m => m.il.il.Id)
+                        }).ToListAsync()
+                            );
+
+
+
+            // var grouplogId = await (databaseContext.ReqIssueMaterialLogs
+            //     .Where(w=> _Status.Contains(w.Status!))
+            //     .GroupBy(g=> g.ReqHid)
+            //     .Select(s=> new {
+            //     ReqHid = s.Key,
+            //     Id = s.Max(m => m.Id)
+            // }).ToListAsync());
+
+            List<int> _whlog = grouplogId.Select(s=> s.Id).ToList();
+
+
+
+            var _reqIssue = await (databaseContext.ReqIssueMaterialHs.GroupJoin(databaseContext.ReqIssueMaterialLogs.Where(w=> _whlog.Contains(w.Id)),
+                                h => new {p1 = h.Id},
+                                l => new {p1 = l.ReqHid},
+                                (h,l) => new { ih = h, il =l})
+                                .SelectMany(sm => sm.il.DefaultIfEmpty(),
+                                    (h,l) => new { ih =h, il = l})
+                                .Where(w=> _Status.Contains(w.ih.ih.Status!) && w.ih.ih.ReqDept == _aprdt.Department && w.il!.Levels <= _aprdt.Levels )
+                                .Select(s=> new { issueHId = s.ih.ih.Id})
+                                .ToListAsync()
+                                );
+
+            List<long>  _whiss = _reqIssue.Select(s=> s.issueHId).ToList();
+
+            
+            reqIssueMaterialH = await (databaseContext.ReqIssueMaterialHs
+                                    .Include(d => d.ReqIssueMaterialDs)
+                                    .Include(log => log.ReqIssueMaterialLogs)
+                                    .Where(w=> _whiss.Contains(w.Id)
+                                     )
+                                    .ToListAsync()
+                                        );
+
+
+            if (reqIssueMaterialH.Count == 0){
+                errorMessage = "Data is not Found.";
+            }
+
+
+
+
+             return (errorMessage,reqIssueMaterialH);
+
+            
+        }
+
+        public async Task<(string errorMessage, List<ReqIssueMaterialH> reqIssueMaterialH)> GetRequestIssueByUser(ReqIssueSearch reqIssueSearch, VwWebUser vwWebUser)
+        {
+             string errorMessage = string.Empty;
+            List<ReqIssueMaterialH> reqIssueMaterialH = new List<ReqIssueMaterialH>();
+
+
+            var _aprdt = await databaseContext.VwWebTpapprovals.Where(w=> w.Program == "ADDON" && w.Types == "Request Mat" && w.Name.ToUpper() == vwWebUser.EmpUsername!.ToUpper()).FirstOrDefaultAsync();
+
+
+            reqIssueMaterialH = await (databaseContext.ReqIssueMaterialHs
+                                    .Include(d => d.ReqIssueMaterialDs.Where(ww=>ww.Status == "A"))
+                                    .Include(log => log.ReqIssueMaterialLogs)
+                                    .Where(w=> w.Status != "Delete" && 
+                                    (string.IsNullOrEmpty(_aprdt.Department) ? 1== 1 : w.ReqDept == _aprdt.Department ) &&
+                                    (w.CreateBy == vwWebUser.EmpUsername) 
+                                     )
+                                    .ToListAsync()
+                                        );
+
+
+            if (reqIssueMaterialH.Count == 0){
+                errorMessage = "Data is not Found.";
+            }
+
+
+
+
+             return (errorMessage,reqIssueMaterialH);
         }
     }
 }

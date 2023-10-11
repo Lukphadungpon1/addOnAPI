@@ -175,3 +175,8 @@ C:\Source\dotnet\AddOn_API\bin\Release\net6.0\System.Security.Cryptography.Pkcs.
 C:\Source\dotnet\AddOn_API\bin\Release\net6.0\System.Text.Encoding.CodePages.dll
 C:\Source\dotnet\AddOn_API\bin\Release\net6.0\runtimes\win\lib\net6.0\System.Security.Cryptography.Pkcs.dll
 C:\Source\dotnet\AddOn_API\bin\Release\net6.0\runtimes\win\lib\net6.0\System.Text.Encoding.CodePages.dll
+C:\Source\dotnet\AddOn_API\bin\Release\net6.0\publish\web.config
+C:\Source\dotnet\AddOn_API\bin\Release\net6.0\publish\AddOn_API.deps.json
+C:\Source\dotnet\AddOn_API\bin\Release\net6.0\publish\AddOn_API.runtimeconfig.json
+C:\Source\dotnet\AddOn_API\bin\Release\net6.0\publish\appsettings.Development.json
+C:\Source\dotnet\AddOn_API\bin\Release\net6.0\publish\appsettings.json

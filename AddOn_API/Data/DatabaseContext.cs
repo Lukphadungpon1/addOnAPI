@@ -30,6 +30,7 @@ namespace AddOn_API.Data
         public virtual DbSet<IssueMaterialD> IssueMaterialDs { get; set; } = null!;
         public virtual DbSet<IssueMaterialH> IssueMaterialHs { get; set; } = null!;
         public virtual DbSet<IssueMaterialLog> IssueMaterialLogs { get; set; } = null!;
+        public virtual DbSet<IssueMaterialManual> IssueMaterialManuals { get; set; } = null!;
         public virtual DbSet<IssueMaterialTranBarcode> IssueMaterialTranBarcodes { get; set; } = null!;
         public virtual DbSet<ProductionOrderD> ProductionOrderDs { get; set; } = null!;
         public virtual DbSet<ProductionOrderH> ProductionOrderHs { get; set; } = null!;
@@ -45,6 +46,7 @@ namespace AddOn_API.Data
         public virtual DbSet<TplocationGroup> TplocationGroups { get; set; } = null!;
         public virtual DbSet<TpstyleWithLocation> TpstyleWithLocations { get; set; } = null!;
         public virtual DbSet<VwGenerateMcgroupSize> VwGenerateMcgroupSizes { get; set; } = null!;
+        public virtual DbSet<VwItemForPicking> VwItemForPickings { get; set; } = null!;
         public virtual DbSet<VwWebTpapproval> VwWebTpapprovals { get; set; } = null!;
         public virtual DbSet<VwWebUser> VwWebUsers { get; set; } = null!;
 
@@ -606,6 +608,8 @@ namespace AddOn_API.Data
 
                 entity.ToTable("IssueMaterialD", "ao");
 
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
                 entity.Property(e => e.IssueHid).HasColumnName("IssueHId");
 
                 entity.Property(e => e.BaseQty).HasColumnType("decimal(18, 6)");
@@ -630,7 +634,15 @@ namespace AddOn_API.Data
 
                 entity.Property(e => e.ItemCode).HasMaxLength(50);
 
+                entity.Property(e => e.ItemCodeRef).HasMaxLength(50);
+
                 entity.Property(e => e.ItemName).HasMaxLength(500);
+
+                entity.Property(e => e.ItemNameRef).HasMaxLength(500);
+
+                entity.Property(e => e.Location)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
 
                 entity.Property(e => e.Lot).HasMaxLength(20);
 
@@ -667,12 +679,6 @@ namespace AddOn_API.Data
                     .HasForeignKey(d => d.IssueHid)
                     .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("FK_IssueMaterialD_IssueMaterialH");
-
-                entity.HasOne(d => d.ReqH)
-                    .WithMany(p => p.IssueMaterialDs)
-                    .HasForeignKey(d => d.ReqHid)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
-                    .HasConstraintName("FK_IssueMaterialD_ReqIssueMaterialH");
             });
 
             modelBuilder.Entity<IssueMaterialH>(entity =>
@@ -707,6 +713,10 @@ namespace AddOn_API.Data
                     .HasMaxLength(50)
                     .IsUnicode(false);
 
+                entity.Property(e => e.Lotlist)
+                    .HasMaxLength(500)
+                    .IsUnicode(false);
+
                 entity.Property(e => e.PickingBy)
                     .HasMaxLength(50)
                     .IsUnicode(false);
@@ -714,6 +724,10 @@ namespace AddOn_API.Data
                 entity.Property(e => e.PickingDate).HasColumnType("datetime");
 
                 entity.Property(e => e.PrintDate).HasColumnType("datetime");
+
+                entity.Property(e => e.Remark)
+                    .HasMaxLength(5000)
+                    .IsUnicode(false);
 
                 entity.Property(e => e.Status)
                     .HasMaxLength(50)
@@ -733,8 +747,6 @@ namespace AddOn_API.Data
             modelBuilder.Entity<IssueMaterialLog>(entity =>
             {
                 entity.ToTable("IssueMaterialLog", "ao");
-
-                entity.Property(e => e.Id).ValueGeneratedNever();
 
                 entity.Property(e => e.Action)
                     .HasMaxLength(50)
@@ -764,6 +776,74 @@ namespace AddOn_API.Data
                     .WithMany(p => p.IssueMaterialLogs)
                     .HasForeignKey(d => d.IssueHid)
                     .HasConstraintName("FK_IssueMaterialLog_IssueMaterialH");
+            });
+
+            modelBuilder.Entity<IssueMaterialManual>(entity =>
+            {
+                entity.ToTable("IssueMaterialManual", "ao");
+
+                entity.Property(e => e.BaseQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.Buy)
+                    .HasMaxLength(6)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.ConfirmQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.ConvertSap).HasColumnName("ConvertSAP");
+
+                entity.Property(e => e.CreateBy)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.CreateDate).HasColumnType("datetime");
+
+                entity.Property(e => e.DocNum)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.IssueHid).HasColumnName("IssueHId");
+
+                entity.Property(e => e.IssueMethod)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.IssueQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.ItemCode).HasMaxLength(50);
+
+                entity.Property(e => e.ItemName).HasMaxLength(500);
+
+                entity.Property(e => e.Location)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.Lot)
+                    .HasMaxLength(500)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.PickQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.PlandQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.Status)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.UpdateBy)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.UpdateDate).HasColumnType("datetime");
+
+                entity.Property(e => e.Warehouse)
+                    .HasMaxLength(10)
+                    .IsFixedLength();
+
+                entity.HasOne(d => d.IssueH)
+                    .WithMany(p => p.IssueMaterialManuals)
+                    .HasForeignKey(d => d.IssueHid)
+                    .HasConstraintName("FK_IssueMaterialManual_IssueMaterialH");
             });
 
             modelBuilder.Entity<IssueMaterialTranBarcode>(entity =>
@@ -1441,6 +1521,55 @@ namespace AddOn_API.Data
                 entity.Property(e => e.Width)
                     .HasMaxLength(50)
                     .IsUnicode(false);
+            });
+
+            modelBuilder.Entity<VwItemForPicking>(entity =>
+            {
+                entity.HasNoKey();
+
+                entity.ToView("VW_ItemForPicking");
+
+                entity.Property(e => e.BaseQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.Buy).HasMaxLength(6);
+
+                entity.Property(e => e.CreateBy)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.CreateDate).HasColumnType("datetime");
+
+                entity.Property(e => e.ItemCode).HasMaxLength(50);
+
+                entity.Property(e => e.ItemName).HasMaxLength(500);
+
+                entity.Property(e => e.Location)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.Lot).HasMaxLength(20);
+
+                entity.Property(e => e.PickQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.PlandQty).HasColumnType("decimal(18, 6)");
+
+                entity.Property(e => e.SizeNo).HasMaxLength(10);
+
+                entity.Property(e => e.Status)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.UomName).HasMaxLength(50);
+
+                entity.Property(e => e.UpdateBy)
+                    .HasMaxLength(50)
+                    .IsUnicode(false);
+
+                entity.Property(e => e.UpdateDate).HasColumnType("datetime");
+
+                entity.Property(e => e.Warehouse)
+                    .HasMaxLength(10)
+                    .IsFixedLength();
             });
 
             modelBuilder.Entity<VwWebTpapproval>(entity =>

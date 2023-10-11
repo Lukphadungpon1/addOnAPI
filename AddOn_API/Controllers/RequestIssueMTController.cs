@@ -69,6 +69,7 @@ namespace AddOn_API.Controllers
             {
                 return Unauthorized();
             }
+
             var account = accountService.GetInfo(accessToken);
 
             ReqIssueMaterialH _data = new ReqIssueMaterialH();
@@ -105,6 +106,56 @@ namespace AddOn_API.Controllers
 
             return StatusCode((int)HttpStatusCode.OK, reqList.Adapt<List<ReqIssueMTH>>());
         }
+
+        [HttpPost("[action]")]
+        public async Task<ActionResult<IEnumerable<ReqIssueMTH>>> GetRequestIssueByApr(ReqIssueSearch model)
+        {
+            // TODO: Your code here
+            var accessToken = await HttpContext.GetTokenAsync("access_token");
+
+            if (accessToken == null)
+            {
+                return Unauthorized();
+            }
+            var account = accountService.GetInfo(accessToken);
+
+           
+           (string errorMessage, List<ReqIssueMaterialH> reqIssueMaterialH) = await reqIssueMTService.GetRequestIssueByApr(model,account);
+
+           if (!string.IsNullOrEmpty(errorMessage)){
+                return StatusCode((int)HttpStatusCode.NotFound,errorMessage);
+           }
+
+
+            return StatusCode((int)HttpStatusCode.OK, reqIssueMaterialH.Adapt<List<ReqIssueMTH>>());
+            
+        
+          
+        }
+        
+        [HttpPost("[action]")]
+        public async Task<ActionResult<IEnumerable<ReqIssueMTH>>> GetRequestIssueByUser(ReqIssueSearch model)
+        {
+          // TODO: Your code here
+            var accessToken = await HttpContext.GetTokenAsync("access_token");
+
+            if (accessToken == null)
+            {
+                return Unauthorized();
+            }
+            var account = accountService.GetInfo(accessToken);
+ 
+           (string errorMessage, List<ReqIssueMaterialH> reqIssueMaterialH) = await reqIssueMTService.GetRequestIssueByUser(model,account);
+
+           if (!string.IsNullOrEmpty(errorMessage)){
+                return StatusCode((int)HttpStatusCode.NotFound,errorMessage);
+           }
+
+
+            return StatusCode((int)HttpStatusCode.OK, reqIssueMaterialH.Adapt<List<ReqIssueMTH>>());
+        }
+        
+
 
 
         [HttpPost("[action]")]
@@ -178,7 +229,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
                 List<string> _itemCodeList = itemD.GroupBy(g => g.ItemCode).Select(s => s.Key).ToList();
                 var onhandSap = await sapSDKService.GetItemOnhand(_itemCodeList);
 
-                var _stdp = itemD.GroupBy(g => new { ArticleCode = g.ItemCodeS, GroupItem = g.ItemCode.Substring(0, 4) }).Select(s => new TpstyleWithLocation
+                var _stdp = itemD.GroupBy(g => new { ArticleCode = g.ItemCodeS.Substring(0,g.ItemCodeS.IndexOf("_")), GroupItem = g.ItemCode.Substring(0, 4) }).Select(s => new TpstyleWithLocation
                 {
                     ArticleCode = s.Key.ArticleCode,
                     GroupItem = s.Key.GroupItem
@@ -192,7 +243,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
 
                     var onhand = onhandSap.Where(w => w.ItemCode == item.ItemCode).FirstOrDefault();
 
-                    var dept = dpitem.Where(w => w.ArticleCode == item.ItemCodeS && w.GroupItem == item.ItemCode.Substring(0, 4)).FirstOrDefault();
+                    var dept = dpitem.Where(w => w.ArticleCode == item.ItemCodeS.Substring(0,item.ItemCodeS.IndexOf("_")) && w.GroupItem == item.ItemCode.Substring(0, 4)).FirstOrDefault();
 
                     item.Department = (dept == null ? "" : dept.Location);
                     item.Onhand = onhand.OnHand;
@@ -218,7 +269,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
 
                     i++;
                     item.Id =i;
-                    item.ItemD =  _itemd;
+                    item.ItemD = _itemd;
                 }
 
                 return StatusCode((int)HttpStatusCode.OK, _itemh);
@@ -259,9 +310,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
                 (string errorMessagechkrel, ReqIssueMaterialH reqIssueMaterialHchkrel) = await reqIssueMTService.VerifyLotReleasedtoPD(reqIssueList);
                 if (!string.IsNullOrEmpty(errorMessagechkrel))
                 {
-                   
-
-
+            
                         respon.Add(new ReqIssueMTResponse
                         {
                             referenceNumber = reqIssueMaterialHchkrel.Lot!,
@@ -271,11 +320,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
                     return StatusCode((int)HttpStatusCode.BadRequest, JsonSerializer.Serialize(respon));
 
                 }
-
-
-             
-
-                    List<ReqIssueMaterialD> _detail = reqIssueList.ReqIssueMaterialDs.Adapt<List<ReqIssueMaterialD>>();
+                    List<ReqIssueMaterialD> _detail = model.ReqIssueMaterialDs.Adapt<List<ReqIssueMaterialD>>();
 
                     string ReqNumber = await reqIssueMTService.GetReqNumber();
 
@@ -290,9 +335,11 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
                         reqIssueList.ReqNumber = ReqNumber;
                         reqIssueList.CreateBy = account.EmpUsername;
                         reqIssueList.CreateDate = System.DateTime.Now;
-                        reqIssueList.Status = "Draft";
+                        reqIssueList.Status = "Request";
 
-                        reqIssueList.ReqIssueMaterialDs = reqIssueList.ReqIssueMaterialDs.Adapt<List<ReqIssueMaterialD>>();
+                        reqIssueList.ReqIssueMaterialDs = model.ReqIssueMaterialDs.Adapt<List<ReqIssueMaterialD>>();
+
+                       
 
                         await reqIssueMTService.Create(reqIssueList);
 
@@ -352,10 +399,28 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
             {
                 var _reqIssueH = await reqIssueMTService.FindById(model.Id);
 
-                ReqIssueMaterialLog _log = model.ReqIssueMaterialLogs.Adapt<ReqIssueMaterialLog>();
+                
+                ReqIssueMTLog _log = new ReqIssueMTLog{
+                    Id = 0,
+                    ReqHid = Convert.ToInt64(2),
+                    Users = "",
+                    LogDate = System.DateTime.Now,  
+                    Status = "",
+                    Levels = 0,
+                    Comment = "",
+                    Action = "",
+                    ClientName = "",
+                };
+
+               
+                foreach(ReqIssueMTLog ilog in model.ReqIssueMaterialLogs){
+                    _log = ilog;
+                }
+                
+               
 
 
-                (string errorMessage, ReqIssueMaterialH reqIssueMaterialH) = await reqIssueMTService.VerifyDataApproveprocess(_reqIssueH.Adapt<ReqIssueMaterialH>(), _log);
+                (string errorMessage, ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMTLog) = await reqIssueMTService.VerifyDataApproveprocess(_reqIssueH, _log.Adapt<ReqIssueMaterialLog>());
 
                 if (!string.IsNullOrEmpty(errorMessage))
                 {
@@ -370,9 +435,9 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
                     _reqIssueH.UpdateDate = System.DateTime.Now;
 
                     await reqIssueMTService.Update(_reqIssueH);
-                    await reqIssueMTService.InsertLogReqIssueMT(_log);
+                    await reqIssueMTService.InsertLogReqIssueMT(_log.Adapt<ReqIssueMaterialLog>());
 
-                    MailData mailData = await reqIssueMTService.PrepareDataApproveprocessSendEmail(_reqIssueH, _log);
+                    MailData mailData = await reqIssueMTService.PrepareDataApproveprocessSendEmail(_reqIssueH, _log.Adapt<ReqIssueMaterialLog>());
 
                     mailService.SendMail(mailData);
 
@@ -390,7 +455,7 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
 
 
         [HttpPost("[action]")]
-        public async Task<ActionResult<ReqIssueMTH>> Approvedprocess(ReqIssueMTH model)
+        public async Task<ActionResult<GenerateResponse>> Approvedprocess(List<ReqIssueMTH> model)
         {
             var accessToken = await HttpContext.GetTokenAsync("access_token");
             if (accessToken == null)
@@ -399,38 +464,68 @@ public async Task<ActionResult<IEnumerable<LocationIssue>>> GetLocationIssue()
             }
             var account = accountService.GetInfo(accessToken);
 
+            List<GenerateResponse> generateResponses = new List<GenerateResponse>();
+
             try
             {
-                var _reqIssueH = await reqIssueMTService.FindById(model.Id);
+                foreach(ReqIssueMTH item in model){
+                    var _reqIssueH = (await reqIssueMTService.FindById(item.Id));
 
-                ReqIssueMaterialLog _log = model.ReqIssueMaterialLogs.Adapt<ReqIssueMaterialLog>();
+                     ReqIssueMTLog _log = new ReqIssueMTLog{
+                        Id = 0,
+                        ReqHid = Convert.ToInt64(2),
+                        Users = "",
+                        LogDate = System.DateTime.Now,  
+                        Status = "",
+                        Levels = 0,
+                        Comment = "",
+                        Action = "",
+                        ClientName = "",
+                    };
 
+                    foreach(ReqIssueMTLog ilog in item.ReqIssueMaterialLogs){
+                        _log = ilog;
+                    }
+                
 
-                (string errorMessage, ReqIssueMaterialH reqIssueMaterialH) = await reqIssueMTService.VerifyDataApproveprocess(_reqIssueH.Adapt<ReqIssueMaterialH>(), _log);
+                (string errorMessage, ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMTLog) = await reqIssueMTService.VerifyDataApproveprocess(_reqIssueH, _log.Adapt<ReqIssueMaterialLog>());
 
                 if (!string.IsNullOrEmpty(errorMessage))
                 {
-
-                    return StatusCode((int)HttpStatusCode.BadRequest, errorMessage);
+                     generateResponses.Add(new GenerateResponse
+                        {
+                            errorMessage = errorMessage,
+                            referenceNumber = _reqIssueH.ReqNumber +"("+_reqIssueH.Lot+")",
+                        });
+                    
+                   // return StatusCode((int)HttpStatusCode.BadRequest, errorMessage);
 
                 }
                 else
                 {
-                    _reqIssueH.Status = _log.Status;
+                    _reqIssueH.Status = (reqIssueMaterialH.Status == "Finish" ? reqIssueMaterialH.Status : _log.Status );
                     _reqIssueH.UpdateBy = account.EmpUsername;
                     _reqIssueH.UpdateDate = System.DateTime.Now;
 
                     await reqIssueMTService.Update(_reqIssueH);
-                    await reqIssueMTService.InsertLogReqIssueMT(_log);
+                    await reqIssueMTService.InsertLogReqIssueMT(reqIssueMTLog);
 
-                    MailData mailData = await reqIssueMTService.PrepareDataApproveprocessSendEmail(_reqIssueH, _log);
+                    MailData mailData = await reqIssueMTService.PrepareDataApproveprocessSendEmail(_reqIssueH, reqIssueMTLog);
 
                     mailService.SendMail(mailData);
 
-                    return StatusCode((int)HttpStatusCode.OK, _reqIssueH);
-
+                   
+                    generateResponses.Add(new GenerateResponse
+                        {
+                            errorMessage = "Complete",
+                            referenceNumber = _reqIssueH.ReqNumber +"("+_reqIssueH.Lot+")",
+                        });
 
                 }
+                }
+
+                 return StatusCode((int)HttpStatusCode.OK, generateResponses);
+                
             }
             catch (Exception ex)
             {

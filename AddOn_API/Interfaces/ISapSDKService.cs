@@ -18,6 +18,7 @@ namespace AddOn_API.Interfaces
 
             Task<IEnumerable<ItemOnhand>> GetItemOnhand(List<string> ItemCodeList);
 
+            Task<IEnumerable<BatchNumber>> GetBatNumber(List<string> ItemCodeList);
 
             Task<(string errorMessage,SaleOrderH saleOrderH )> ConvertSaleOrder(SaleOrderH saleOrderHs);
             Task<(string errorMessage,SaleOrderH saleOrderH)> UpdateSaleOrder(SaleOrderH saleOrderHs,List<SaleOrderD> saleOrderDNew);
@@ -34,5 +35,9 @@ namespace AddOn_API.Interfaces
     
 
             Task<(string errorMessage,BomOfMaterialH bomOfMaterialH)> ConvertBomOfMaterial(BomOfMaterialH bomOfMaterialH );
+
+            Task<(string errorMessage,IssueMaterialH issueMaterialH,List<BatchNumber> batchNumbersRT)> ConvertIssueMaterial(IssueMaterialH issueMaterialH,List<ProductionOrderH> productionOrderHs,List<BatchNumber> batchNumbers);
+
+            Task<(string errorMessage,IssueMaterialH issueMaterialH)> ConvertIssueMaterialML(IssueMaterialH issueMaterialH,List<BatchNumber> batchNumbers);
     }
 }

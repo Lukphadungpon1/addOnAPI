@@ -1,6 +1,11 @@
 C:\Source\dotnet\AddOn_API\publish\AddOn_API.exe
+C:\Source\dotnet\AddOn_API\publish\publish\web.config
 C:\Source\dotnet\AddOn_API\publish\appsettings.Development.json
 C:\Source\dotnet\AddOn_API\publish\appsettings.json
+C:\Source\dotnet\AddOn_API\publish\publish\AddOn_API.deps.json
+C:\Source\dotnet\AddOn_API\publish\publish\AddOn_API.runtimeconfig.json
+C:\Source\dotnet\AddOn_API\publish\publish\appsettings.Development.json
+C:\Source\dotnet\AddOn_API\publish\publish\appsettings.json
 C:\Source\dotnet\AddOn_API\publish\AddOn_API.dll
 C:\Source\dotnet\AddOn_API\publish\AddOn_API.runtimeconfig.json
 C:\Source\dotnet\AddOn_API\publish\AddOn_API.pdb

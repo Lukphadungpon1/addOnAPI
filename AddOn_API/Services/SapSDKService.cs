@@ -102,6 +102,7 @@ namespace AddOn_API.Services
 
                 if (res != 0)
                 {
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
                     errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity
                 }
 
@@ -118,10 +119,13 @@ namespace AddOn_API.Services
                     _saleOrderH.ConvertSap = 1;
                     _saleOrderH.DocEntry = Convert.ToInt32(objectKey);
                 }
-                else
+                else{
                     errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity  
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
+                }
+                    
 
-
+                
                 oCompany.Disconnect();
 
 
@@ -129,6 +133,7 @@ namespace AddOn_API.Services
             catch (Exception ex)
             {
                 //ex.ToString();
+                
                 errorMessage = ex.Message.ToString();
                 oCompany.Disconnect();
             }
@@ -325,6 +330,7 @@ namespace AddOn_API.Services
 
                 if (res != 0)
                 {
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
                     errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity
                 }
 
@@ -343,7 +349,12 @@ namespace AddOn_API.Services
                     
                 }
                 else
+                {
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
                     errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity  
+
+                }
+                    
 
                 oCompany.Disconnect();
 
@@ -490,7 +501,11 @@ namespace AddOn_API.Services
                     _bomMTH = bomOfMaterialH;
                 }
                 else
+                   {
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
                     errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity  
+
+                }
 
                 oCompany.Disconnect();
 
@@ -499,6 +514,7 @@ namespace AddOn_API.Services
             catch (Exception ex)
             {
                 //ex.ToString();
+                
                 errorMessage = ex.Message.ToString();
                 oCompany.Disconnect();
             }
@@ -1209,6 +1225,69 @@ namespace AddOn_API.Services
             return _detailItem;
         }
 
+          public async Task<IEnumerable<BatchNumber>> GetBatNumber(List<string> ItemCodeList)
+        {
+            SAPbobsCOM.Company oCompany = setDefaultString();
+
+            var _detailItem = new List<BatchNumber>();
+
+            try
+            {
+                if (oCompany.Connect() != 1)
+                    oCompany.Connect();
+
+                if (!oCompany.InTransaction)
+                    oCompany.StartTransaction();
+
+                string whitem = "";
+                whitem = string.Join("','",ItemCodeList);
+
+                SAPbobsCOM.Recordset oIS = (SAPbobsCOM.Recordset)oCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset);
+                oIS.DoQuery("select OIBT.ItemCode,OIBT.WhsCode,OIBT.Quantity,0 as usedQty,OBTN.DistNumber,OBTN.InDate " + 
+                            "from OIBT OIBT " + 
+                            "left join OBTN  OBTN " + 
+                            "on OBTN.ItemCode = OIBT.ItemCode " + 
+                            "and OBTN.DistNumber = OIBT.BatchNum " + 
+                            "where OIBT.Quantity <> 0 " + 
+                            "and OIBT.ItemCode in ('" + whitem + "') " + 
+                            "order by OIBT.ItemCode,OIBT.WhsCode,OIBT.InDate asc ");
+
+                int id = 0;
+                while (!oIS.EoF)
+                { 
+                    _detailItem.Add(new BatchNumber
+                    {
+                        Id= id,
+                        ItemCode = oIS.Fields.Item("ItemCode").Value.ToString(),
+                        WhsCode = oIS.Fields.Item("WhsCode").Value.ToString(),
+                        Quantity = Convert.ToDecimal(oIS.Fields.Item("Quantity").Value.ToString()),
+                        UsedQty = Convert.ToDecimal(oIS.Fields.Item("usedQty").Value.ToString()),
+                        DistNumber = oIS.Fields.Item("DistNumber").Value.ToString(),
+                        InDate  = Convert.ToDateTime(oIS.Fields.Item("InDate").Value.ToString())
+                    });
+                    id ++;
+                    oIS.MoveNext();
+
+
+                }
+
+                if (oCompany.InTransaction)
+                {
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_Commit);
+                }
+                oCompany.Disconnect();
+
+            }
+            catch (Exception ex)
+            {
+                ex.ToString();
+
+                oCompany.Disconnect();
+            }
+
+            return _detailItem;
+        }
+
 
 
 
@@ -1229,6 +1308,8 @@ namespace AddOn_API.Services
                 SAPbobsCOM.DocumentTypeParams typeParams = (SAPbobsCOM.DocumentTypeParams)seriesService.GetDataInterface(SAPbobsCOM.SeriesServiceDataInterfaces.ssdiDocumentTypeParams);
 
                 typeParams.Document = documentType;  ////po document
+
+  
                 SAPbobsCOM.Series se = seriesService.GetDefaultSeries(typeParams);
                 _series = se.Series;
                 _seriesNumber = se.NextNumber;
@@ -1299,7 +1380,276 @@ namespace AddOn_API.Services
             }
         }
 
-        
+        public async Task<(string errorMessage, IssueMaterialH issueMaterialH,List<BatchNumber> batchNumbersRT)> ConvertIssueMaterial(IssueMaterialH issueMaterialH,List<ProductionOrderH> productionOrderHs,List<BatchNumber> batchNumbers)
+        {
+
+            SAPbobsCOM.Company oCompany = setDefaultString();
+
+            string errorMessage = string.Empty;
+            IssueMaterialH _issueMaterialH = new IssueMaterialH();
+            _issueMaterialH = issueMaterialH;
+
+            List<BatchNumber> _batchNumberRT = new List<BatchNumber>();
+            _batchNumberRT.AddRange(batchNumbers.ToList());
+
+
+
+            var salePersonSAP = await GetSalePerson();
+            int salePerson = !(salePersonSAP.FirstOrDefault(w => w.SlpCode == 5) == null) ? salePersonSAP.FirstOrDefault(w => w.SlpCode == 5).SlpCode.Value : -1;
+
+            (string errorMessageSeries, int Series, int SeriesNumber) = await GetSeriesSAP("60");  //Issue For Production (OIGE)= 60
+
+            if (errorMessageSeries != "")
+            {
+                errorMessage = errorMessageSeries;
+                return (errorMessage, _issueMaterialH,_batchNumberRT);
+            }
+
+             try
+            {
+                if (oCompany.Connect() != 1)
+                    oCompany.Connect();
+
+                if (!oCompany.InTransaction)
+                    oCompany.StartTransaction();
+
+                SAPbobsCOM.Documents GIFPD = (SAPbobsCOM.Documents)oCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oInventoryGenExit);
+
+                GIFPD.Series = Convert.ToInt32(Series);
+                //DraftPO.Series = int.Parse("2132");
+                GIFPD.DocNum = SeriesNumber;
+                //Saleorder.SalesPersonCode = salePerson_OSLP; /////
+                GIFPD.Comments = "Automatically created by Receipt from Production "+issueMaterialH.Lotlist;
+               // GIFPD.Reference2 = issueMaterialH.IssueNumber;
+                GIFPD.DocDate = System.DateTime.Now;
+                GIFPD.JournalMemo = "";
+
+                foreach (IssueMaterialD data in issueMaterialH.IssueMaterialDs)
+                {
+                    ProductionOrderH _PH = productionOrderHs.Where(w=> w.Id == data.Pdhid).FirstOrDefault();
+
+                    GIFPD.Lines.BaseEntry = _PH.DocEntry!.Value;
+                    GIFPD.Lines.BaseType = 202; 
+                    GIFPD.Lines.BaseLine = data.LineNum;
+                   // GIFPD.Lines.ItemCode = data.ItemCode;
+                   // GIFPD.Lines.ItemDescription = data.ItemName;
+                    GIFPD.Lines.Quantity = Convert.ToDouble(data.PickQty!.Value);
+                    GIFPD.Lines.UseBaseUnits = SAPbobsCOM.BoYesNoEnum.tYES;
+                   // GIFPD.Lines.Currency = "THB";
+                   // GIFPD.Lines.Rate = 0;
+                    GIFPD.Lines.WarehouseCode = data.Warehouse!.Trim();
+
+                    //int batLineNum = GIFPD.Lines.BatchNumbers.BaseLineNumber;
+                    //GIFPD.Lines.BatchNumbers.BaseLineNumber = batLineNum - 1;
+                   decimal _qtybatch = Convert.ToDecimal(data.PickQty!.Value);
+                   int checkloop = 0;
+                    do
+                    {
+                       
+                        BatchNumber _batchNumber = _batchNumberRT.Where(w=> w.ItemCode == data.ItemCode && w.Quantity != w.UsedQty).OrderBy(o=> o.InDate).FirstOrDefault()!;
+
+                        if ((_batchNumber.Quantity - _batchNumber.UsedQty) >= (_qtybatch !=  Convert.ToDecimal(data.PickQty!.Value) ? Convert.ToDecimal(data.PickQty!.Value) - _qtybatch : _qtybatch)){
+                            _qtybatch = (_qtybatch !=  Convert.ToDecimal(data.PickQty!.Value) ? Convert.ToDecimal(data.PickQty!.Value) - _qtybatch : _qtybatch);
+                            checkloop = 1;
+                            
+                        }else{
+                            _qtybatch =  (_batchNumber.Quantity - _batchNumber.UsedQty);
+                        }
+                        _batchNumber.UsedQty = _batchNumber.UsedQty + _qtybatch ;
+                        
+                        GIFPD.Lines.BatchNumbers.BatchNumber = _batchNumber.DistNumber;
+                        GIFPD.Lines.BatchNumbers.Quantity =  Convert.ToDouble(_qtybatch);
+                        GIFPD.Lines.BatchNumbers.Add();
+                   
+                    } while (checkloop != 1);
+
+                    //GIFPD.Lines.BatchNumbers.BaseLineNumber = 0;
+                    // GIFPD.Lines.BatchNumbers.BatchNumber = "202308";
+                    // GIFPD.Lines.BatchNumbers.Quantity =  Convert.ToDouble(data.PickQty!.Value);
+                    // GIFPD.Lines.BatchNumbers.Add();
+
+                    GIFPD.Lines.Add();
+                }
+                int res = GIFPD.Add();
+
+                if (res != 0)
+                {
+                   
+                    errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
+                    oCompany.Disconnect();
+
+                     return (errorMessage, _issueMaterialH,_batchNumberRT);
+                   
+                }
+
+                if (oCompany.InTransaction)
+                {
+
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_Commit);
+
+                    string objectKey = oCompany.GetNewObjectKey();
+
+                    _issueMaterialH.DocNum = Convert.ToString(SeriesNumber);
+                    _issueMaterialH.Status = "Issued";
+                    _issueMaterialH.ConvertSap = 1;
+                    _issueMaterialH.DocEntry = Convert.ToInt32(objectKey);
+                }
+                else
+                {
+                   
+                    errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity  
+                     oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
+
+                }
+
+                oCompany.Disconnect();
+
+
+            }
+            catch (Exception ex)
+            {
+                //ex.ToString();
+                errorMessage = ex.Message.ToString();
+                oCompany.Disconnect();
+            }
+
+
+           return (errorMessage, _issueMaterialH,_batchNumberRT);
+            
+        }
+
+        public async Task<(string errorMessage, IssueMaterialH issueMaterialH)> ConvertIssueMaterialML(IssueMaterialH issueMaterialH,List<BatchNumber> batchNumbers)
+        {
+             SAPbobsCOM.Company oCompany = setDefaultString();
+
+            string errorMessage = string.Empty;
+            IssueMaterialH _issueMaterialH = new IssueMaterialH();
+            _issueMaterialH = issueMaterialH;
+
+            List<BatchNumber> _batchNumberRT = new List<BatchNumber>();
+            _batchNumberRT.AddRange(batchNumbers.ToList());
+
+
+            var salePersonSAP = await GetSalePerson();
+            int salePerson = !(salePersonSAP.FirstOrDefault(w => w.SlpCode == 5) == null) ? salePersonSAP.FirstOrDefault(w => w.SlpCode == 5).SlpCode.Value : -1;
+
+            (string errorMessageSeries, int Series, int SeriesNumber) = await GetSeriesSAP("60");  //Issue For Production (OIGE)= 60
+
+            if (errorMessageSeries != "")
+            {
+                errorMessage = errorMessageSeries;
+                return (errorMessage, _issueMaterialH);
+            }
+
+             try
+            {
+                if (oCompany.Connect() != 1)
+                    oCompany.Connect();
+
+                if (!oCompany.InTransaction)
+                    oCompany.StartTransaction();
+
+                SAPbobsCOM.Documents GIFPD = (SAPbobsCOM.Documents)oCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oInventoryGenExit);
+
+                GIFPD.Series = Convert.ToInt32(Series);
+                //DraftPO.Series = int.Parse("2132");
+                GIFPD.DocNum = SeriesNumber;
+                //Saleorder.SalesPersonCode = salePerson_OSLP; /////
+                GIFPD.Comments = "Automatically created by Receipt from Production (Manual) "+issueMaterialH.Lotlist;
+              //  GIFPD.Reference2 = issueMaterialH.IssueNumber;
+                GIFPD.DocDate = System.DateTime.Now;
+  
+
+                foreach (IssueMaterialManual data in issueMaterialH.IssueMaterialManuals)
+                {
+                  
+                    GIFPD.Lines.ItemCode = data.ItemCode;
+                    GIFPD.Lines.ItemDescription = data.ItemName;
+                    GIFPD.Lines.Quantity = Convert.ToDouble(data.PickQty!.Value);
+                    GIFPD.Lines.UseBaseUnits = SAPbobsCOM.BoYesNoEnum.tYES;
+                    //GIFPD.Lines.Currency = "THB";
+                    //GIFPD.Lines.Rate = 0;
+                    GIFPD.Lines.WarehouseCode = data.Warehouse!.Trim();
+
+                    decimal _qtybatch = Convert.ToDecimal(data.PickQty!.Value);
+                   int checkloop = 0;
+                    do
+                    {
+                       
+                        BatchNumber _batchNumber = _batchNumberRT.Where(w=> w.ItemCode == data.ItemCode && w.Quantity != w.UsedQty).OrderBy(o=> o.InDate).FirstOrDefault()!;
+
+                        if ((_batchNumber.Quantity - _batchNumber.UsedQty) >= (_qtybatch !=  Convert.ToDecimal(data.PickQty!.Value) ? Convert.ToDecimal(data.PickQty!.Value) - _qtybatch : _qtybatch)){
+
+                            _qtybatch = (_qtybatch !=  Convert.ToDecimal(data.PickQty!.Value) ? Convert.ToDecimal(data.PickQty!.Value) - _qtybatch : _qtybatch);
+                            checkloop = 1;
+                            
+                        }else{
+                            _qtybatch =  (_batchNumber.Quantity - _batchNumber.UsedQty);
+                        }
+
+                        _batchNumber.UsedQty = _batchNumber.UsedQty + _qtybatch ;
+                        
+                        GIFPD.Lines.BatchNumbers.BatchNumber = _batchNumber.DistNumber;
+                        GIFPD.Lines.BatchNumbers.Quantity =  Convert.ToDouble(_qtybatch);
+                        GIFPD.Lines.BatchNumbers.Add();
+
+                    } while (checkloop != 1);
+                    
+                    GIFPD.Lines.Add();
+
+                }
+                int res = GIFPD.Add();
+
+                if (res != 0)
+                {
+                    errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
+
+                    oCompany.Disconnect();
+                    return (errorMessage, _issueMaterialH);
+                }
+
+
+                if (oCompany.InTransaction)
+                {
+
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_Commit);
+
+                    string objectKey = oCompany.GetNewObjectKey();
+
+                    foreach(IssueMaterialManual data in _issueMaterialH.IssueMaterialManuals){
+                        data.DocEntry = Convert.ToInt32(objectKey);
+                        data.DocNum  = SeriesNumber.ToString();
+                        data.ConvertSap = 1;
+                        data.Status = "Issued";
+                        data.IssueQty = data.PickQty;
+                    }
+                   
+                }
+                else{
+                    oCompany.EndTransaction(SAPbobsCOM.BoWfTransOpt.wf_RollBack);
+                    errorMessage = oCompany.GetLastErrorDescription().ToString(); //@scope_identity  
+
+                }
+
+
+                oCompany.Disconnect();
+                
+
+            }
+            catch (Exception ex)
+            {
+                //ex.ToString();
+                errorMessage = ex.Message.ToString();
+                oCompany.Disconnect();
+            }
+
+            return (errorMessage, _issueMaterialH);
+
+        }
+
+      
         public class SAPConnect
         {
             public string Username { get; set; }

@@ -34,9 +34,11 @@ namespace AddOn_API.Entities
         public string? UpdateBy { get; set; }
         public DateTime? UpdateDate { get; set; }
         public string? Status { get; set; }
+        public string? ItemCodeRef { get; set; }
+        public string? ItemNameRef { get; set; }
+        public string? Location { get; set; }
 
         public virtual IssueMaterialH IssueH { get; set; } = null!;
-        public virtual ReqIssueMaterialH ReqH { get; set; } = null!;
         public virtual ICollection<IssueMaterialTranBarcode> IssueMaterialTranBarcodes { get; set; }
     }
 }

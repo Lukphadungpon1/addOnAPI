@@ -25,7 +25,12 @@ namespace AddOn_API.Interfaces
 
         Task InsertLogReqIssueMT(ReqIssueMaterialLog reqIssueMaterialLog);
 
+        Task<(string errorMessage,List<ReqIssueMaterialH> reqIssueMaterialH)> GetRequestIssueByApr(ReqIssueSearch reqIssueSearch,VwWebUser vwWebUser);
 
+        Task<(string errorMessage,List<ReqIssueMaterialH> reqIssueMaterialH)> GetRequestIssueByUser(ReqIssueSearch reqIssueSearch,VwWebUser vwWebUser);
+
+
+        
         Task<IEnumerable<AllocateLot>> FindLotRequestMT(AllocateLot allocateLot);
 
         Task<IEnumerable<ReqIssueMTItemList>> GetPDItemFromLot(AllocateLot allocateLot);
@@ -33,7 +38,7 @@ namespace AddOn_API.Interfaces
         Task<(string errorMessage,ReqIssueMaterialH reqIssueMaterialH)> VerifyDataCreate(ReqIssueMaterialH reqIssueMaterialH);
         Task<(string errorMessage,ReqIssueMaterialH reqIssueMaterialH)> VerifyDataUpdate(long id);
         Task<(string errorMessage,ReqIssueMaterialH ReqIssueMaterialH)> VerifyDataDelete(long id);
-        Task<(string errorMessage,ReqIssueMaterialH reqIssueMaterialH)> VerifyDataApproveprocess(ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMaterialLog);
+        Task<(string errorMessage,ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMTLog)> VerifyDataApproveprocess(ReqIssueMaterialH reqIssueMaterialH,ReqIssueMaterialLog reqIssueMaterialLog);
 
         Task<(string errorMessage,ReqIssueMaterialH reqIssueMaterialHres)> VerifyLotReleasedtoPD(ReqIssueMaterialH reqIssueMaterialH);
 

@@ -9,6 +9,7 @@ namespace AddOn_API.DTOs.ReqIssueMT
         public string? RequestBy { get; set; }
         public DateTime? RequestDate { get; set; }
         public string? ReqDept { get; set; }
+        public string? Site { get; set; }
         public DateTime? RequireDate { get; set; }
         public string? Remark { get; set; }
         public string? CreateBy { get; set; }

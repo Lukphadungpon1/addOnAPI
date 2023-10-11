@@ -7,7 +7,6 @@ namespace AddOn_API.Entities
     {
         public ReqIssueMaterialH()
         {
-            IssueMaterialDs = new HashSet<IssueMaterialD>();
             ReqIssueMaterialDs = new HashSet<ReqIssueMaterialD>();
             ReqIssueMaterialLogs = new HashSet<ReqIssueMaterialLog>();
         }
@@ -27,7 +26,6 @@ namespace AddOn_API.Entities
         public DateTime? UpdateDate { get; set; }
         public string? Status { get; set; }
 
-        public virtual ICollection<IssueMaterialD> IssueMaterialDs { get; set; }
         public virtual ICollection<ReqIssueMaterialD> ReqIssueMaterialDs { get; set; }
         public virtual ICollection<ReqIssueMaterialLog> ReqIssueMaterialLogs { get; set; }
     }
